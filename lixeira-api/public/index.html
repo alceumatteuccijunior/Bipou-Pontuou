@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triagem por Foto - ChatGPT & ESP32</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background: #1e1e1e; 
+            color: #fff; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        h1 { color: #f4f4f9; }
+        .cam-container { 
+            position: relative; 
+            display: inline-block; 
+            margin-bottom: 15px; 
+        }
+        video { 
+            border: 3px solid #444; 
+            border-radius: 8px; 
+            width: 100%;
+            max-width: 640px; 
+            height: auto; 
+            object-fit: cover; 
+            background: #000;
+        }
+        button { 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            padding: 15px 30px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            transition: background 0.2s;
+        }
+        button:hover { background: #218838; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        
+        #resultado { 
+            margin-top: 20px; 
+            font-size: 18px; 
+            padding: 15px 20px; 
+            border-radius: 8px; 
+            display: inline-block; 
+            width: 90%;
+            max-width: 600px; 
+            background: #333; 
+            box-sizing: border-box;
+            text-align: left;
+        }
+
+        /* Cores baseadas na classificação */
+        .Plastico { border: 2px solid #00bcd4; color: #00bcd4; }
+        .Papel { border: 2px solid #ffeb3b; color: #ffeb3b; }
+        .Metal { border: 2px solid #ff9800; color: #ff9800; }
+        .Desconhecido { border: 2px solid #dc3545; color: #dc3545; }
+        
+        .status-esp { 
+            font-size: 14px; 
+            margin-top: 10px; 
+            padding-top: 8px; 
+            border-top: 1px solid #444; 
+            color: #aaa; 
+        }
+        .descricao-texto {
+            font-size: 15px;
+            color: #ddd;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Triagem por Captura Pontual (OpenAI + ESP32)</h1>
+
+    <div class="cam-container">
+        <video id="webcam" autoplay playsinline></video>
+    </div>
+
+    <div>
+        <button id="btnCapturar" onclick="tirarFotoEAnalisar()">📸 Tirar Foto e Classificar</button>
+    </div>
+
+    <div id="resultado">Aguardando disparo...</div>
+
+    <!-- Canvas oculto para capturar a imagem estática -->
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const btn = document.getElementById('btnCapturar');
+        const resultadoDiv = document.getElementById('resultado');
+
+        // Inicializa a câmara externa/traseira
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 640, height: 480 } })
+            .then(stream => video.srcObject = stream)
+            .catch(err => {
+                console.error("Erro na câmara:", err);
+                resultadoDiv.innerText = "Erro ao acessar a câmara. Verifique as permissões.";
+            });
+
+        async function tirarFotoEAnalisar() {
+            btn.disabled = true;
+            resultadoDiv.className = "";
+            resultadoDiv.innerText = "A analisar imagem com o ChatGPT Vision...";
+
+            // 1. Tira o 'frame' estático do vídeo e desenha no canvas
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // 2. Converte a foto tirada em Base64
+            const imagemBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+            try {
+                // 3. Envia a foto para a API Node.js
+                const response = await fetch('/api/classificar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imagemBase64 })
+                });
+
+                const data = await response.json();
+
+                if (data.material) {
+                    resultadoDiv.className = data.material;
+                    resultadoDiv.innerHTML = `
+                        <div><strong>Material Identificado:</strong> ${data.material} <em>(Confiança: ${data.confianca || 'N/A'})</em></div>
+                        <div class="descricao-texto"><strong>Descrição:</strong> ${data.descricao || 'Sem descrição'}</div>
+                        <div class="status-esp"><strong>Comando ESP32:</strong> ${data.esp32Status || 'Não executado'}</div>
+                    `;
+                } else {
+                    resultadoDiv.className = "Desconhecido";
+                    resultadoDiv.innerText = "Erro ao identificar o material ou resposta inválida.";
+                }
+
+            } catch (err) {
+                console.error(err);
+                resultadoDiv.className = "Desconhecido";
+                resultadoDiv.innerText = "Erro de conexão com o servidor Node.js.";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

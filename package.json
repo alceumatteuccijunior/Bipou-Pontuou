@@ -1,0 +1,11 @@
+{
+  "name": "bipou-pontuou",
+  "version": "1.0.0",
+  "description": "Lixeira Inteligente com IA & ESP32 — Bipou, Pontuou",
+  "main": "server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "backend": "cd backend && npm start"
+  }
+}
+

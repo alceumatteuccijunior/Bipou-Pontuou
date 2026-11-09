@@ -1,0 +1,9 @@
+# Variáveis de ambiente e chaves secretas
+.env
+backend/.env
+lixeira-api/.env
+
+# Dependências e cache
+node_modules/
+__pycache__/
+*.pyc

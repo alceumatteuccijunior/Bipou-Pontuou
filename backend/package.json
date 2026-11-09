@@ -1,0 +1,22 @@
+{
+  "name": "bipa-pesa-backend",
+  "version": "1.0.0",
+  "description": "API REST da plataforma escolar de reciclagem Bipa&Pesa",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.24.6",
+    "openai": "^7.50.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

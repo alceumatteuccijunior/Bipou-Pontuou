@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta name="theme-color" content="#16834A">
+  <meta name="description" content="Bipou, Pontuou — lixeira inteligente com IA e ESP32. Recicle, acumule 50 pontos por descarte e troque por balas!">
+
+  <title>Bipou, Pontuou | Lixeira Inteligente & Área do Aluno</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="icon" href="robozinho.png" type="image/png">
+  <link rel="preload" href="robologo.png" as="image">
+
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem('bipa_theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        document.documentElement.dataset.theme =
+          saved || (prefersDark ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- TELA DE ENTRADA -->
+  <div id="site-splash" class="site-splash">
+    <div class="splash-glow" aria-hidden="true"></div>
+
+    <img
+      src="robologo.png"
+      alt="Bipou, Pontuou"
+      class="splash-logo"
+    >
+  </div>
+
+  <!-- TOASTS DE NOTIFICAÇÃO -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- =========================
+       TELA DE LOGIN POR CPF (SEM SENHA)
+  ========================== -->
+
+  <main id="login-screen" class="login-screen">
+
+    <div class="login-container">
+
+      <div class="login-brand">
+        <div class="login-logo-wrap">
+          <img
+            src="robologo.png"
+            alt="Bipou, Pontuou"
+            class="login-logo"
+          >
+        </div>
+      </div>
+
+      <div class="login-content">
+
+        <span class="eyebrow">LIXEIRA INTELIGENTE & ÁREA DO ALUNO</span>
+
+        <h1>
+          Bem-vindo ao<br>
+          <span>Bipou, Pontuou!</span>
+        </h1>
+
+        <p class="login-description">
+          Acesse direto pelo seu <strong>CPF</strong>. Se já tiver cadastro, você entra direto sem senha. Se for seu primeiro acesso, sua conta é criada automaticamente!
+        </p>
+
+        <form id="auth-form" class="login-form">
+
+          <label>
+            CPF do Aluno
+            <input
+              id="input-cpf"
+              name="cpf"
+              type="tel"
+              inputmode="numeric"
+              maxlength="14"
+              placeholder="000.000.000-00"
+              autocomplete="off"
+              required
+            >
+            <small>
+              Digite apenas os números do seu CPF.
+            </small>
+          </label>
+
+          <label>
+            Seu Nome <span class="muted">(opcional para primeiro acesso)</span>
+            <input
+              id="input-name"
+              name="nome"
+              type="text"
+              maxlength="120"
+              placeholder="Ex.: Leonardo da Silva"
+              autocomplete="name"
+            >
+          </label>
+
+          <button
+            id="auth-submit-button"
+            class="btn btn-primary btn-full login-button"
+            type="submit"
+          >
+            <span id="auth-submit-text">Acessar minha carteira ➔</span>
+          </button>
+
+          <p id="auth-error" class="form-error"></p>
+
+        </form>
+
+      </div>
+
+      <div class="login-footer">
+        <span>♻️</span>
+        Descarte certo • Ganhe 50 pts • Troque por balas (40 pts)
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- =========================
+       SISTEMA PRINCIPAL (DASHBOARD)
+  ========================== -->
+
+  <div id="app-screen" class="app-screen hidden">
+
+    <!-- HEADER -->
+    <header class="topbar">
+
+      <a href="#" class="brand" aria-label="Bipou, Pontuou">
+        <div class="brand-logo-wrap">
+          <img
+            src="robologo.png"
+            alt="Bipou, Pontuou"
+            class="brand-logo"
+          >
+        </div>
+      </a>
+
+      <div class="topbar-actions">
+
+        <button
+          id="btn-theme"
+          class="icon-button"
+          type="button"
+          aria-label="Alternar tema"
+          title="Alternar tema claro/escuro"
+        >
+          ☾
+        </button>
+
+        <div id="user-menu" class="user-menu">
+
+          <button
+            id="btn-user-menu"
+            class="user-chip"
+            type="button"
+          >
+            <span id="user-avatar" class="avatar">B</span>
+            <span id="user-menu-name">Aluno</span>
+            <span class="user-arrow">⌄</span>
+          </button>
+
+          <div id="user-dropdown" class="dropdown hidden">
+            <button id="btn-my-profile" type="button">
+              👤 Meu perfil
+            </button>
+            <button id="btn-logout" type="button" class="danger-text">
+              🚪 Sair
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="page">
+
+      <section class="dashboard">
+
+        <!-- CABEÇALHO BOAS-VINDAS -->
+        <div class="welcome-row">
+          <div>
+            <span class="eyebrow">MINHA CARTEIRA ECOLÓGICA</span>
+            <h1>
+              Olá, <span id="dashboard-name">Aluno</span> 👋
+            </h1>
+            <p>
+              Descarte seus resíduos na lixeira inteligente e acumule pontos!
+            </p>
+          </div>
+
+          <button
+            id="btn-refresh"
+            class="btn btn-outline"
+            type="button"
+          >
+            🔄 Atualizar
+          </button>
+        </div>
+
+        <!-- CARD DE PONTOS + BANNER DE BALAS -->
+        <section id="points-section" class="points-wallet">
+
+          <div class="points-card">
+            <div class="points-card-header">
+              <div>
+                <span class="points-label">Seus pontos</span>
+                <span class="points-subtitle">Saldo disponível</span>
+              </div>
+              <div class="points-symbol">★</div>
+            </div>
+
+            <div class="points-balance">
+              <strong id="balance-points">0</strong>
+              <span>pts</span>
+            </div>
+
+            <div class="points-card-footer">
+              <span>
+                ✨ Cada descarte correto vale <strong>+50 pts</strong>!
+              </span>
+            </div>
+          </div>
+
+          <!-- RESUMO E TROCA DIRETA POR BALAS -->
+          <div class="wallet-summary">
+
+            <div class="wallet-stat candy-banner-stat">
+              <span class="wallet-stat-icon candy-icon">🍬</span>
+              <div class="candy-banner-info">
+                <span class="candy-tag">1 BALA = 40 PONTOS</span>
+                <strong id="available-candies-text">0 balas disponíveis</strong>
+                <button
+                  id="btn-quick-candy-exchange"
+                  class="btn btn-candy-cta"
+                  type="button"
+                >
+                  Trocar meus pontos por balas ➔
+                </button>
+              </div>
+            </div>
+
+            <div class="wallet-stat-row">
+              <div class="wallet-stat">
+                <span class="wallet-stat-icon">♻️</span>
+                <div>
+                  <strong id="total-recycling">0</strong>
+                  <span>descartes com IA</span>
+                </div>
+              </div>
+
+              <div class="wallet-stat">
+                <span class="wallet-stat-icon trophy">🏆</span>
+                <div>
+                  <strong id="user-position">—</strong>
+                  <span>posição no ranking</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ATALHOS RÁPIDOS -->
+        <section class="quick-actions">
+
+          <div class="section-title">
+            <span class="eyebrow">AÇÕES RÁPIDAS</span>
+            <h2>O que você quer fazer?</h2>
+          </div>
+
+          <div class="quick-actions-grid">
+
+            <button
+              id="btn-quick-deposit"
+              class="quick-action action-highlight"
+              type="button"
+            >
+              <span class="quick-icon green">📸</span>
+              <span class="quick-text">
+                <strong>Depositar lixo (Câmera IA)</strong>
+                <small>Foto automática + Acionamento ESP32 (+50 pts)</small>
+              </span>
+              <span class="quick-arrow">→</span>
+            </button>
+
+            <button
+              id="btn-quick-candies"
+              class="quick-action"
+              type="button"
+            >
+              <span class="quick-icon purple">🍬</span>
+              <span class="quick-text">
+                <strong>Trocar pontos por balas</strong>
+                <small>40 pontos por bala com comprovante digital</small>
+              </span>
+              <span class="quick-arrow">→</span>
+            </button>
+
+            <button
+              class="quick-action"
+              type="button"
+              data-scroll-to="history-section"
+            >
+              <span class="quick-icon blue">📜</span>
+              <span class="quick-text">
+                <strong>Histórico & Comprovantes</strong>
+                <small>Veja descartes e seus comprovantes de balas</small>
+              </span>
+              <span class="quick-arrow">→</span>
+            </button>
+
+            <button
+              class="quick-action"
+              type="button"
+              data-scroll-to="ranking-section"
+            >
+              <span class="quick-icon yellow">🏆</span>
+              <span class="quick-text">
+                <strong>Ranking Escolar</strong>
+                <small>Veja quem mais recicla na escola</small>
+              </span>
+              <span class="quick-arrow">→</span>
+            </button>
+
+          </div>
+
+        </section>
+
+        <!-- HISTÓRICO + RANKING -->
+        <section class="content-grid">
+
+          <!-- HISTÓRICO -->
+          <section id="history-section" class="panel">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">MOVIMENTAÇÕES RECENTES</span>
+                <h2>Seu histórico</h2>
+              </div>
+            </div>
+
+            <div id="history-list" class="list"></div>
+          </section>
+
+          <!-- RANKING -->
+          <section id="ranking-section" class="panel">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">TOP RECICLADORES</span>
+                <h2>Ranking da escola</h2>
+              </div>
+            </div>
+
+            <div id="ranking-list" class="ranking-list"></div>
+          </section>
+
+        </section>
+
+        <!-- RECOMPENSAS / BALAS -->
+        <section id="rewards-section" class="panel rewards-panel">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">CATÁLOGO DE RECOMPENSAS</span>
+              <h2>Troque seus pontos</h2>
+            </div>
+            <span class="muted">
+              Balas por 40 pontos cada
+            </span>
+          </div>
+
+          <div id="rewards-grid" class="rewards-grid"></div>
+        </section>
+
+        <!-- MATERIAIS ACEITOS PELA LIXEIRA -->
+        <section id="materials-section" class="materials-section">
+          <div class="section-heading centered">
+            <span class="eyebrow">TRIAGEM AUTOMÁTICA POR IA</span>
+            <h2>Materiais que a lixeira inteligente reconhece</h2>
+            <p class="section-description">
+              Coloque um tipo de cada vez na lixeira. O ChatGPT Vision identifica e o ESP32 abre o compartimento correto.
+            </p>
+          </div>
+
+          <div id="materials-grid" class="materials-grid"></div>
+        </section>
+
+      </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <strong>Bipou, Pontuou</strong>
+      <span>
+        Lixeira Inteligente com IA, ESP32 e Gamificação Escolar. 🌱🤖
+      </span>
+    </footer>
+
+  </div>
+
+  <!-- =========================================================
+       MODAL 1: FLUXO DA LIXEIRA INTELIGENTE (CÂMERA + IA + ESP32)
+  ========================================================= -->
+
+  <div
+    id="deposit-modal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="deposit-modal-title"
+  >
+    <div class="modal-backdrop" data-close-modal></div>
+
+    <div class="modal-card camera-modal-card">
+
+      <button
+        class="modal-close"
+        type="button"
+        data-close-modal
+        aria-label="Fechar"
+      >
+        ×
+      </button>
+
+      <!-- PASSO 1: INSTRUÇÃO E CÂMERA AO VIVO -->
+      <div id="deposit-step-camera">
+
+        <div class="modal-header-badge">
+          <span class="live-indicator">● AO VIVO</span>
+          <span class="eyebrow" id="camera-source-label">CÂMERA FIXA DA LIXEIRA</span>
+        </div>
+
+        <h2 id="deposit-modal-title">Deposite seu lixo</h2>
+
+        <div class="trash-instruction-box">
+          <p>
+            ♻️ <strong>Instrução:</strong> Deposite seu lixo na lixeira, <strong>um tipo de cada vez</strong> (Papel, Metal ou Plástico).
+          </p>
+          <div class="materials-badge-row">
+            <span class="mat-badge mat-plastico">🧴 Plástico</span>
+            <span class="mat-badge mat-metal">🥫 Metal</span>
+            <span class="mat-badge mat-papel">📄 Papel</span>
+          </div>
+        </div>
+
+        <!-- VISOR DA CÂMERA FIXA DA LIXEIRA (STREAM DO SERVIDOR + WEBCAM LOCAL) -->
+        <div class="camera-viewport-container">
+          <img id="lixeira-stream" class="lixeira-stream-view" alt="Câmera ao vivo da lixeira inteligente">
+          <video id="webcam" class="hidden" autoplay playsinline muted></video>
+          <canvas id="camera-canvas" width="640" height="480" style="display: none;"></canvas>
+
+          <!-- Moldura de foco visual -->
+          <div class="camera-overlay">
+            <div class="target-bracket corner-tl"></div>
+            <div class="target-bracket corner-tr"></div>
+            <div class="target-bracket corner-bl"></div>
+            <div class="target-bracket corner-br"></div>
+            <div class="target-center-dot"></div>
+            <span class="target-hint-text">Enquadre o material na lixeira e clique em Feito</span>
+          </div>
+        </div>
+
+        <div id="camera-error-box" class="camera-error-message hidden">
+          ⚠️ Não foi possível ligar a câmera diretamente. Você também pode enviar uma foto do dispositivo:
+          <input type="file" id="fallback-file-input" accept="image/*" capture="environment">
+        </div>
+
+        <div class="modal-actions camera-actions">
+          <button
+            class="btn btn-outline"
+            type="button"
+            data-close-modal
+          >
+            Cancelar
+          </button>
+
+          <button
+            id="btn-done-deposit"
+            class="btn btn-primary btn-done-capture"
+            type="button"
+          >
+            <span>📸 Feito! Tirar foto e descartar</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- PASSO 2: PROCESSANDO IA E ESP32 -->
+      <div id="deposit-step-processing" class="hidden text-center processing-state">
+        <div class="ai-loading-spinner">
+          <div class="spinner-ring"></div>
+          <span class="spinner-icon">🤖</span>
+        </div>
+
+        <span class="eyebrow">TRIAGEM EM ANDAMENTO</span>
+        <h2>Analisando com Inteligência Artificial...</h2>
+        <p class="processing-subtitle">
+          O <strong>ChatGPT Vision</strong> está identificando o material e o <strong>ESP32</strong> está acionando o motor da lixeira inteligente.
+        </p>
+
+        <div class="ai-steps-checklist">
+          <div class="checklist-item done">✓ Foto capturada</div>
+          <div class="checklist-item active">● Classificando material (Plástico / Papel / Metal)...</div>
+          <div class="checklist-item">○ Acionando motor da lixeira via ESP32</div>
+          <div class="checklist-item">○ Creditando +50 pontos na sua carteira</div>
+        </div>
+      </div>
+
+      <!-- PASSO 3: SUCESSO E PONTOS GANHOS -->
+      <div id="deposit-step-success" class="hidden text-center">
+
+        <div class="modal-icon success-icon">🎉</div>
+        <span class="eyebrow">DESCARTE CONCLUÍDO</span>
+        <h2>Parabéns!</h2>
+
+        <div class="result-details-card">
+          <div class="result-photo-wrap">
+            <img id="result-photo-preview" src="" alt="Foto do descarte" class="result-photo">
+            <span id="result-material-badge" class="result-badge">Plástico</span>
+          </div>
+
+          <div class="result-info-text">
+            <p id="result-description">Material reciclável identificado.</p>
+            <div id="result-esp-status" class="esp-status-pill">ESP32: Comando executado</div>
+          </div>
+        </div>
+
+        <div class="earned-points-card">
+          <span>Você ganhou</span>
+          <strong id="earned-points-val">+50 pts</strong>
+          <small id="earned-points-label">adicionados à sua carteira ecológica</small>
+        </div>
+
+        <div class="modal-actions">
+          <button
+            id="btn-another-deposit"
+            class="btn btn-outline"
+            type="button"
+          >
+            ♻️ Descartar outro
+          </button>
+
+          <button
+            id="btn-finish-deposit"
+            class="btn btn-primary"
+            type="button"
+          >
+            Ver meus pontos
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =========================================================
+       MODAL 2: TROCAR PONTOS POR BALAS (40 PTS CADA)
+  ========================================================= -->
+
+  <div
+    id="candy-modal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="candy-modal-title"
+  >
+    <div class="modal-backdrop" data-close-modal></div>
+
+    <div class="modal-card small-modal">
+
+      <button
+        class="modal-close"
+        type="button"
+        data-close-modal
+        aria-label="Fechar"
+      >
+        ×
+      </button>
+
+      <div class="modal-icon candy-modal-icon">🍬</div>
+
+      <span class="eyebrow">TROCA DE PONTOS</span>
+      <h2 id="candy-modal-title">Trocar pontos por balas</h2>
+
+      <p class="candy-modal-subtitle">
+        Cada bala custa <strong>40 pontos</strong>. Escolha quantas balas você quer retirar:
+      </p>
+
+      <div class="candy-selector-box">
+        <div class="candy-counter-control">
+          <button type="button" id="btn-candy-minus" class="counter-btn" aria-label="Diminuir">-</button>
+          <div class="counter-value">
+            <strong id="candy-qty-display">1</strong>
+            <span>bala(s)</span>
+          </div>
+          <button type="button" id="btn-candy-plus" class="counter-btn" aria-label="Aumentar">+</button>
+        </div>
+
+        <div class="candy-calc-summary">
+          <div>
+            <span>Custo total:</span>
+            <strong id="candy-total-points-cost">40 pts</strong>
+          </div>
+          <div>
+            <span>Seu saldo atual:</span>
+            <strong id="candy-user-balance-display">0 pts</strong>
+          </div>
+        </div>
+
+        <div id="candy-alert-box" class="form-error hidden"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button
+          class="btn btn-outline"
+          type="button"
+          data-close-modal
+        >
+          Cancelar
+        </button>
+
+        <button
+          id="btn-confirm-candy-exchange"
+          class="btn btn-primary btn-candy-confirm"
+          type="button"
+        >
+          Trocar e Gerar Comprovante
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =========================================================
+       MODAL 3: COMPROVANTE OFICIAL DE TROCA DE BALAS
+  ========================================================= -->
+
+  <div
+    id="voucher-modal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="voucher-title"
+  >
+    <div class="modal-backdrop" data-close-modal></div>
+
+    <div class="modal-card voucher-modal-card">
+
+      <button
+        class="modal-close"
+        type="button"
+        data-close-modal
+        aria-label="Fechar"
+      >
+        ×
+      </button>
+
+      <!-- TICKET / VOUCHER -->
+      <div class="ticket-wrapper">
+
+        <div class="ticket-header">
+          <span class="ticket-seal">🍬 BIPOU, PONTUOU</span>
+          <h2 id="voucher-title">Comprovante de Balas</h2>
+          <span class="ticket-date" id="voucher-date">04/11/2026, 15:30</span>
+        </div>
+
+        <div class="ticket-code-block">
+          <span class="ticket-code-label">CÓDIGO DE RETIRADA</span>
+          <strong class="ticket-code" id="voucher-code">#BALA-XXXX-XXXX</strong>
+        </div>
+
+        <div class="ticket-details">
+          <div class="ticket-row">
+            <span>Aluno:</span>
+            <strong id="voucher-student-name">Leonardo</strong>
+          </div>
+          <div class="ticket-row">
+            <span>CPF:</span>
+            <strong id="voucher-student-cpf">***.***.***-**</strong>
+          </div>
+          <div class="ticket-row highlight-row">
+            <span>Quantidade de balas:</span>
+            <strong id="voucher-candies-qty">1 Bala 🍬</strong>
+          </div>
+          <div class="ticket-row">
+            <span>Pontos utilizados:</span>
+            <strong id="voucher-points-spent">40 pontos</strong>
+          </div>
+          <div class="ticket-row">
+            <span>Status:</span>
+            <strong class="status-valid" id="voucher-status">🟢 Válido para troca</strong>
+          </div>
+        </div>
+
+        <div class="ticket-notice">
+          📢 <strong>Apresente esta tela</strong> ao professor ou responsável na escola para retirar suas balas!
+        </div>
+
+      </div>
+
+      <div class="modal-actions voucher-actions">
+        <button
+          class="btn btn-outline"
+          type="button"
+          onclick="window.print()"
+        >
+          🖨️ Imprimir / Salvar
+        </button>
+
+        <button
+          class="btn btn-primary"
+          type="button"
+          data-close-modal
+        >
+          Concluir
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =========================================================
+       MODAL 4: PERFIL DO ALUNO
+  ========================================================= -->
+
+  <div
+    id="profile-modal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="profile-title"
+  >
+    <div class="modal-backdrop" data-close-modal></div>
+
+    <div class="modal-card small-modal">
+
+      <button
+        class="modal-close"
+        type="button"
+        data-close-modal
+        aria-label="Fechar"
+      >
+        ×
+      </button>
+
+      <div class="profile-big-avatar" id="profile-avatar">
+        B
+      </div>
+
+      <span class="eyebrow">MEU PERFIL</span>
+      <h2 id="profile-title">Aluno</h2>
+      <p id="profile-cpf-text" class="muted">CPF: ***.***.***-**</p>
+
+      <div class="profile-stats">
+        <div>
+          <strong id="profile-points">0</strong>
+          <span>pontos</span>
+        </div>
+
+        <div>
+          <strong id="profile-rank">—</strong>
+          <span>posição</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+
+</body>
+</html>
